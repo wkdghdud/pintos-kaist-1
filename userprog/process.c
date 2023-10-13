@@ -27,6 +27,14 @@ static void process_cleanup(void);
 static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
+struct segment_aux{
+	struct file *file;
+	off_t ofs;
+	uint8_t *upage;
+	uint32_t read_bytes;
+	uint32_t zero_bytes;
+	bool writable;
+};
 
 struct semaphore exec_sema;
 struct semaphore fdt_cpy_sema;
@@ -934,11 +942,31 @@ install_page(void *upage, void *kpage, bool writable)
  * upper block. */
 
 static bool
-lazy_load_segment(struct page *page, void *aux)
-{
-	/* TODO: Load the segment from the file */
-	/* TODO: This called when the first page fault occurs on address VA. */
-	/* TODO: VA is available when calling this function. */
+lazy_load_segment (struct page *page, void *aux) {
+    if (page == NULL) // 페이지 주소에 대한 유효성 검증
+        return false;
+
+	ASSERT(page->frame->kva !=NULL);
+
+	struct segment_aux *aux_ = aux;
+	struct file *file = aux_->file;
+	off_t ofs = aux_->ofs;
+	uint32_t read_bytes = aux_->read_bytes;
+	uint32_t zero_bytes = aux_->zero_bytes;
+	bool writable= aux_->writable;
+	file_seek(file,ofs);
+
+	if(page == NULL){
+		printf("page is null\n");
+		return false;
+	}
+
+	if(file_read(file,page->frame->kva,read_bytes)!=(int)read_bytes){
+		printf("file_Read_fao;\n");
+		vm_dealloc_page(page);
+		return false;
+	}
+    return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -956,28 +984,37 @@ lazy_load_segment(struct page *page, void *aux)
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
 static bool
-load_segment(struct file *file, off_t ofs, uint8_t *upage,
-			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
-{
-	ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
-	ASSERT(pg_ofs(upage) == 0);
-	ASSERT(ofs % PGSIZE == 0);
-
-	while (read_bytes > 0 || zero_bytes > 0)
-	{
-		/* Do calculate how to fill this page.
-		 * We will read PAGE_READ_BYTES bytes from FILE
-		 * and zero the final PAGE_ZERO_BYTES bytes. */
+load_segment (struct file *file, off_t ofs, uint8_t *upage,
+		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
+	ASSERT (pg_ofs (upage) == 0);
+	ASSERT (ofs % PGSIZE == 0);
+	off_t read_start = ofs;
+	while (read_bytes > 0 || zero_bytes > 0) {
+		/* 이 페이지를 채우는 방법을 계산합니다.
+		FILE에서 PAGE_READ_BYTES 바이트를 읽고	
+		마지막 PAGE_ZERO_BYTES 바이트를 0으로 설정합니다. */
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
-		if (!vm_alloc_page_with_initializer(VM_ANON, upage,
-											writable, lazy_load_segment, aux))
+		/* TODO: lazy_load_segment에 정보를 전달하도록 aux를 설정한다. */
+		struct segment_aux *aux;
+        aux = (struct segment_aux *)malloc(sizeof(struct segment_aux));
+		aux->file =file;
+		aux->ofs = read_start;
+		aux->read_bytes = page_read_bytes;
+		aux->zero_bytes = page_zero_bytes;
+		aux -> writable = writable;
+		
+		//널말고 파일읽을때 필요한 정보 넣어주기, 얘를 판단해서 읽음 
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
+					writable, lazy_load_segment, aux)){
 			return false;
-
+					}
+		
 		/* Advance. */
+		read_start +=page_read_bytes;
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
@@ -987,16 +1024,20 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 static bool
-setup_stack(struct intr_frame *if_)
-{
+setup_stack (struct intr_frame *if_) {
 	bool success = false;
-	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-
+	if (vm_alloc_page(VM_ANON, stack_bottom,true)){
+		if(vm_claim_page(stack_bottom)){
+			if_->rsp = USER_STACK;
+			success=true;
+		}
+	}
 	return success;
 }
 #endif /* VM */
