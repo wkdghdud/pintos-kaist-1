@@ -13,6 +13,11 @@
 #include "vm/vm.h"
 #endif
 
+
+/* System Call */
+#define FDT_PAGES 3
+#define FDCOUNT_LIMIT FDT_PAGES *(1<<9) // limit fdidx
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -127,6 +132,8 @@ struct thread
 	int fork_depth;
 	uint8_t is_kernel;
 	int exit_code;
+	
+	/*project3*/
 
 	// #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -136,6 +143,7 @@ struct thread
 // #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
+	void* stack_bottom;
 	struct supplemental_page_table spt;
 #endif
 	/* Owned by thread.c. */

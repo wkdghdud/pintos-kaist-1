@@ -18,9 +18,14 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 
+#include "threads/mmu.h"
+
+#include "vm/vm.h"
+
+
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-
+static struct semaphore syscall_sema;
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -48,6 +53,7 @@ void syscall_init(void)
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
 							((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
+	sema_init(&syscall_sema, 1);
 
 	/* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
@@ -142,12 +148,27 @@ void fd_close(int fd)
 	curr->fd_cnt--;
 }
 
+static bool buffer_protection(void *buffer){
+	struct thread *curr = thread_current();
+	uint8_t *upage = pg_round_down(buffer);
+	uint64_t *pte = pml4e_walk(curr->pml4, upage, 0);
+	if (*pte != NULL && !is_writable(pte))
+		return false;
+	return true;
+}
+
+
 int fd_read(int fd, void *buffer, size_t size)
 {
+
 	struct thread *curr = thread_current();
 	/* 유효하지 않은 fd */
 	if (fd < 0)
 		return -1;
+	if(spt_find_page(&curr->spt, buffer)->writable==0);	
+	// /* write 가능한 버퍼인지 검사 */
+	// if(!buffer_protection(buffer))
+	// 	exit(-1);
 
 	/* 표준 입출력 fd 읽기 */
 	if (curr->fdt[fd].stdio != 0)
@@ -184,6 +205,8 @@ int fd_write(int fd, char *buffer, unsigned size)
 	/* 유효하지 않은 fd */
 	if (fd < 0)
 		return 0;
+
+
 
 	if (curr->fdt[fd].stdio != 0)
 	{
@@ -291,33 +314,89 @@ unsigned fd_tell (int fd){
 	return file_tell(curr->fdt[fd].file);
 }
 
+/*------project3-----*/
+//addr = start
+// mmap()이 파일에 가상 페이지 매핑을 해줘도 적합한지를 체크해주는 함수
+// static struct file *find_file_by_fd(int fd)
+// {
+// 	struct thread *cur = thread_current();
+
+// 	// Error - invalid fd
+// 	if (fd < 0 || fd >= FDCOUNT_LIMIT)
+// 		return NULL;
+
+// 	return cur->fdt[fd].file; // automatically returns NULL if empty
+// }
+static int fd_remove(char *str)
+{
+	return filesys_remove(str);
+}
+
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+
+	// 파일의 시작점(offset)이 page-align되지 않았을 때
+	if(offset % PGSIZE != 0){
+		return NULL;
+	}
+	// 가상 유저 page 시작 주소가 page-align되어있지 않을 때
+	/* failure case 2: 해당 주소의 시작점이 page-align되어 있는지 & user 영역인지 & 주소값이 null인지 & length가 0이하인지*/
+	if(pg_round_down(addr)!= addr || is_kernel_vaddr(addr) || addr == NULL || (long long)length <= 0){
+		return NULL;
+	}
+	// 매핑하려는 페이지가 이미 존재하는 페이지와 겹칠 때(==SPT에 존재하는 페이지일 때)
+	if(spt_find_page(&thread_current()->spt,addr)){
+		return NULL;
+	}
+	// 콘솔 입출력과 연관된 파일 디스크립터 값(0: STDIN, 1:STDOUT)일 때
+	if(fd == 0 || fd == 1){
+		return NULL;
+	}
+	// 찾는 파일이 디스크에 없는경우
+	struct thread* curr = thread_current();
+	struct file * target = file_reopen(curr->fdt[fd].file);
+	if (target==NULL){
+		return NULL;
+	}
+	return do_mmap(addr, length, writable, target, offset);
+}
+
+void
+munmap (void *addr) {
+	do_munmap(addr);
+}
+
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
 {
 	// TODO: Your implementation goes here.
 	// printf ("system call!\n");
 	/* The main system call interface */
+	sema_down(&syscall_sema);
 	switch (f->R.rax)
 	{
 	case SYS_HALT:
 		power_off();
 		break;
 	case SYS_EXIT:
+		sema_up(&syscall_sema);
 		exit(f->R.rdi);
 	case SYS_FORK:
 		f->R.rax = sys_fork(f);
 		break;
 	case SYS_EXEC:
+		sema_up(&syscall_sema);
 		f->R.rax = exec(f->R.rdi);
 		break;
 	case SYS_WAIT:
+		sema_up(&syscall_sema);
 		f->R.rax = process_wait(f->R.rdi);
 		break;
 	case SYS_CREATE:
 		f->R.rax = file_create(f->R.rdi, f->R.rsi);
 		break;
 	case SYS_REMOVE:
-
+		f->R.rax = fd_remove(f->R.rdi);
 		break;
 	case SYS_OPEN:
 		f->R.rax = fd_open(f->R.rdi);
@@ -340,12 +419,17 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_CLOSE:
 		fd_close(f->R.rdi);
 		break;
-
 	case SYS_DUP2:
 		f->R.rax = dup2(f->R.rdi, f->R.rsi);
 		break;
-
+	case SYS_MMAP:
+	    f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
+		break;
 	default:
 		break;
 	}
+	sema_up(&syscall_sema);
 }

@@ -164,23 +164,20 @@ hash_apply (struct hash *h, hash_action_func *action) {
 	}
 }
 
-/* Initializes I for iterating hash table H.
+/* 해시 테이블 H를 이터레이팅하기 위해 I를 초기화합니다.
 
-   Iteration idiom:
+이터레이션 관용구:
 
-   struct hash_iterator i;
+struct hash_iterator i;
 
-   hash_first (&i, h);
-   while (hash_next (&i))
-   {
-   struct foo *f = hash_entry (hash_cur (&i), struct foo, elem);
-   ...do something with f...
-   }
-
-   Modifying hash table H during iteration, using any of the
-   functions hash_clear(), hash_destroy(), hash_insert(),
-   hash_replace(), or hash_delete(), invalidates all
-   iterators. */
+hash_first (&i, h);
+while (hash_next (&i))
+{
+struct foo *f = hash_entry (hash_cur (&i), struct foo, elem);
+... f로 무엇인가 수행합니다 ...
+}
+이터레이션 중에 해시 테이블 H를 수정하는 경우, hash_clear(), hash_destroy(), hash_insert(),
+hash_replace(), 또는 hash_delete()와 같은 함수를 사용하면 모든 이터레이터가 무효화됩니다. */
 void
 hash_first (struct hash_iterator *i, struct hash *h) {
 	ASSERT (i != NULL);
@@ -215,9 +212,8 @@ hash_next (struct hash_iterator *i) {
 	return i->elem;
 }
 
-/* Returns the current element in the hash table iteration, or a
-   null pointer at the end of the table.  Undefined behavior
-   after calling hash_first() but before hash_next(). */
+/* "해시 테이블 이터레이션에서 현재 요소를 반환하거나 테이블의 끝에서는 널 포인터를 반환합니다.
+ hash_first()를 호출한 후 hash_next()를 호출하기 전에는 정의되지 않은 동작입니다."*/
 struct hash_elem *
 hash_cur (struct hash_iterator *i) {
 	return i->elem;

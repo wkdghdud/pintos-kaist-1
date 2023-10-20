@@ -27,14 +27,14 @@ static void process_cleanup(void);
 static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
-struct segment_aux{
-	struct file *file;
-	off_t ofs;
-	uint8_t *upage;
-	uint32_t read_bytes;
-	uint32_t zero_bytes;
-	bool writable;
-};
+// struct segment_aux{
+// 	struct file *file;
+// 	off_t ofs;
+// 	uint8_t *upage;
+// 	uint32_t read_bytes;
+// 	uint32_t zero_bytes;
+// 	bool writable;
+// };
 
 struct semaphore exec_sema;
 struct semaphore fdt_cpy_sema;
@@ -468,7 +468,7 @@ void process_exit(void)
 	/* TODO: 여기에 코드를 작성하세요.
 	 * TODO: 프로세스 종료 메시지를 구현하세요 (project2/process_termination.html 참조).
 	 * TODO: 여기에서 프로세스 리소스 정리를 구현하는 것을 권장합니다. */
-
+	process_cleanup();
 	if (!curr->is_kernel)
 	{
 		printf("%s: exit(%d)\n", curr->name, curr->exit_code);
@@ -479,6 +479,7 @@ void process_exit(void)
 		curr->child_info->status = CHILD_EXIT;
 		if (curr->exe_file != NULL)
 			file_close(curr->exe_file);
+			//process_cleanup ();
 		sema_up(&curr->parent->wait_sema);
 	}
 	}
@@ -509,7 +510,6 @@ void process_exit(void)
 			free(trash);
 		}
 	}
-
 	process_cleanup();
 }
 
@@ -941,7 +941,7 @@ install_page(void *upage, void *kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
     if (page == NULL) // 페이지 주소에 대한 유효성 검증
         return false;

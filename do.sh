@@ -1,5 +1,5 @@
 # cd threads
-cd userprog
+cd vm
 make clean
 make
 cd build
@@ -33,4 +33,7 @@ source ../../activate
 # pintos  --fs-disk=10 -p tests/userprog/read-stdout:read-stdout -- -q   -f run read-stdout
 
 
-pintos -v -k -T 600 -m 20 -m 20  --fs-disk=10 -p tests/userprog/no-vm/multi-oom:multi-oom -- -q  -f run multi-oom
+# pintos -v -k -T 600 -m 20 -m 20  --fs-disk=10 -p tests/userprog/no-vm/multi-oom:multi-oom -- -q  -f run multi-oom
+#pintos --fs-disk=10 -p tests/userprog/args-none:args-none --swap-disk=4 -- -q   -f run args-none
+#pintos --fs-disk=10 -p tests/vm/pt-grow-bad:pt-grow-bad --swap-disk=4 -- -q   -f run pt-grow-bad
+pintos --fs-disk=10 -p tests/userprog/fork-once:fork-once --swap-disk=4 -- -q   -f run fork-once

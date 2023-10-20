@@ -47,9 +47,10 @@ struct page {
 	const struct page_operations *operations;
 	void *va;             /* 사용자 공간 주소*/
 	struct frame *frame;   /* 프레임에 대한 역참조 */
-
+	bool writable;
 	/* Your implementation */
 	struct hash_elem hash_elem;
+	int page_cnt; // only for file-mapped pages
 /*	 각 유형의 데이터가 연합(union)에 바인딩됩니다.
 	 각 함수는 현재의 연합을 자동으로 감지합니다.
 	 연합은 다른 유형의 데이터 메모리르 역역에 저장할 수 있는 특수한 데이터 유형,
@@ -65,7 +66,14 @@ struct page {
 #endif
 	};
 };
+struct lazy_file
+{
+    off_t ofs;
+    uint32_t page_read_bytes;
+    uint32_t page_zero_bytes;
+    bool writable;
 
+};
 /* The representation of "frame" */
 struct frame {
 	void *kva;
