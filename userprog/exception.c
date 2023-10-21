@@ -158,6 +158,7 @@ page_fault(struct intr_frame *f)
 
 	/* Count page faults. */
 	page_fault_cnt++;
+	exit(-1);
 	if (thread_current()->exit_code == -9999)
 	{
 		thread_current()->exit_code = -9999;

@@ -149,49 +149,108 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 }
 
 /* Get the struct frame, that will be evicted. */
-static struct frame *
-vm_get_victim (void) {
+// static struct frame *
+// vm_get_victim (void) {
+// 	struct frame *victim = NULL;
+// 	 /* TODO: The policy for eviction is up to you. */
+
+// 	return victim;
+// }
+static struct frame *vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-
+	/* P3 추가 */
+	victim = list_entry(list_pop_front(&frame_table), struct frame, frame_elem); // FIFO algorithm
 	return victim;
 }
 
+
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
+// static struct frame *
+// vm_evict_frame (void) {
+// 	struct frame *victim UNUSED = vm_get_victim ();
+// 	/* TODO: swap out the victim and return the evicted frame. */
+
+// 	return NULL;
+// }
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
+	struct frame *victim = vm_get_victim();
 	/* TODO: swap out the victim and return the evicted frame. */
-
-	return NULL;
+	#ifdef DBG_swap
+		printf("(vm_evict_frame) frame %p(page %p) selected and now swapping out\n", victim->kva, victim->page->va);
+	#endif
+	if(victim->page != NULL){
+		swap_out(victim->page);
+	}
+	// Manipulate swap table according to its design
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
  * and return it. This always return valid address. That is, if the user pool
  * memory is full, this function evicts the frame to get the available memory
  * space.*/
-static struct frame *
-vm_get_frame (void) {
+// static struct frame *
+// vm_get_frame (void) {
+// 	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
+// 	//frame 구조체를 위한 공간 할당, 작으므로 Malloc으로 깃북 memory allocation에 나옴
+// 	//커널이랑 매칭될 놈이기 떄문에 ㅋㅋ
+// 	/* TODO: Fill this function. */
+// 	/*palloc_get_page : 사용 가능한 단일 페이지를 가져오고 커널 가상주소를 반환한다. PAL_USER가 설정되어 있으면
+// 	사용자 풀에서 페이지를 가져오고, 그렇지 않으먼 커널풀에서 페이지를 가져온다. FLAGS에 PAL_ZERO가 설정되어있으면
+// 	그 페이지는 0으로 채워진다. 사용가능한 페이지가 없으면 FLAGS에서 PAL_ASSERT가 설정되어 있지 않은 경우 NULL포인터를
+// 	반환한다. 이 경우 커널 패닉이 발생*/
+// 	frame -> kva = palloc_get_page(PAL_USER|PAL_ZERO);//유저풀(실제메모리)로 부터 페이지 하나를 가져온다, 사용가능한 페이지가 없을 경우 null리턴
+// 	if(frame->kva==NULL || frame == NULL){
+// 		// frame = vm_evict_frame();//swap out 수행(프레임을 내쫓고 해당 공간을 가져온다.)
+// 		// frame->page=NULL;
+// 		// return frame;//무조건 유효한 공간만 리턴한다 -> swap out을 통해 공간확보후 리턴하기 떄문
+// 		PANIC("TODO");
+// 	}
+// 	list_push_back(&frame_table , &frame->frame_elem);
+// 	frame->page=NULL;//페이지랑 매칭이 안됐으니까
+// 	ASSERT (frame != NULL);
+// 	ASSERT (frame->page == NULL);
+// 	return frame;
+// }
+// static struct frame *vm_get_frame (void) {
+// 	struct frame *frame = NULL;
+// 	void *kva = palloc_get_page(PAL_USER);
+// 	/* TODO: Fill this function. */
+
+// 	/* P3 추가 */
+// 	if (kva == NULL){ // NULL이면(사용 가능한 페이지가 없으면) 
+// 		frame = vm_evict_frame(); // 페이지 삭제 후 frame 리턴
+// 	}
+// 	else{ // 사용 가능한 페이지가 있으면
+// 		frame = malloc(sizeof(struct frame)); // 페이지 사이즈만큼 메모리 할당
+// 		frame->kva = kva;
+// 	}
+// 	list_push_back(&frame_table,&frame->frame_elem);
+// 	ASSERT (frame != NULL);
+// 	// ASSERT (frame->page == NULL);
+// 	return frame;
+// }
+static struct frame *vm_get_frame (void) {
 	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
-	//frame 구조체를 위한 공간 할당, 작으므로 Malloc으로 깃북 memory allocation에 나옴
-	//커널이랑 매칭될 놈이기 떄문에 ㅋㅋ
 	/* TODO: Fill this function. */
-	/*palloc_get_page : 사용 가능한 단일 페이지를 가져오고 커널 가상주소를 반환한다. PAL_USER가 설정되어 있으면
-	사용자 풀에서 페이지를 가져오고, 그렇지 않으먼 커널풀에서 페이지를 가져온다. FLAGS에 PAL_ZERO가 설정되어있으면
-	그 페이지는 0으로 채워진다. 사용가능한 페이지가 없으면 FLAGS에서 PAL_ASSERT가 설정되어 있지 않은 경우 NULL포인터를
-	반환한다. 이 경우 커널 패닉이 발생*/
-	frame -> kva = palloc_get_page(PAL_USER|PAL_ZERO);//유저풀(실제메모리)로 부터 페이지 하나를 가져온다, 사용가능한 페이지가 없을 경우 null리턴
-	if(frame->kva==NULL || frame == NULL){
-		// frame = vm_evict_frame();//swap out 수행(프레임을 내쫓고 해당 공간을 가져온다.)
-		// frame->page=NULL;
-		// return frame;//무조건 유효한 공간만 리턴한다 -> swap out을 통해 공간확보후 리턴하기 떄문
-		PANIC("TODO");
+
+	frame->kva = palloc_get_page(PAL_USER | PAL_ZERO);
+
+	if (frame->kva == NULL) {
+		frame = vm_evict_frame();
 	}
-	list_push_back(&frame_table , &frame->frame_elem);
-	frame->page=NULL;//페이지랑 매칭이 안됐으니까
-	ASSERT (frame != NULL);
-	ASSERT (frame->page == NULL);
+	
+	if (frame != NULL) {
+		list_push_back(&frame_table, &frame->frame_elem);
+		frame->page = NULL;
+		ASSERT(frame->page == NULL);
+	}
+
+	ASSERT(frame != NULL);
+
 	return frame;
 }
 

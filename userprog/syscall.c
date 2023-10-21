@@ -25,7 +25,7 @@
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-static struct semaphore syscall_sema;
+struct semaphore syscall_sema;
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler

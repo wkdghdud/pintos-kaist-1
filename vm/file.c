@@ -31,24 +31,28 @@ vm_file_init (void) {
 /* Initialize the file backed page */
 bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
+
 	/* Set up the handler */
 	page->operations = &file_ops;
 
+
 	struct file_page *file_page = &page->file;
+
 }
 
 /* Swap in the page by read contents from the file. */
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
-}
 
+}
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
@@ -124,27 +128,14 @@ void do_munmap (void *addr) {
 		struct thread *curr = thread_current();
 		struct page *find_page = spt_find_page(&curr->spt, addr);
 	
-		// struct frame *find_frame =find_page->frame;
 		if (find_page == NULL) {
     		return NULL;
     	}
-		// 연결 해제
-		// find_page->frame = NULL;
-		// find_frame->page = NULL;
 		struct lazy_mmap *aux = (struct lazy_mmap* )find_page->uninit.aux;
-		// 페이지의 dirty bit이 1이면 true를, 0이면 false를 리턴한다.
 		if (pml4_is_dirty(curr->pml4, find_page->va)){
-			// 물리 프레임에 변경된 데이터를 다시 디스크 파일에 업데이트 buffer에 있는 데이터를 size만큼, file의 file_ofs부터 써준다.
-			
-
-			// file_write_at(aux->file, addr, 4096, aux->offset);
-			// printf("z\n");
-			// printf("z\n");
 
 			file_seek(find_page->file.file,find_page->file.offset);
 			file_write(find_page->file.file, addr, find_page->file.page_length);
-			// dirty bit = 0
-			// 인자로 받은 dirty의 값이 1이면 page의 dirty bit을 1로, 0이면 0으로 변경해준다.
 			pml4_set_dirty(curr->pml4,find_page->va,0);
 		} else{
 			pml4_clear_page(curr->pml4, find_page->va); 
@@ -152,11 +143,6 @@ void do_munmap (void *addr) {
 			hash_delete(&curr->spt, &find_page->hash_elem);
 			free(find_page);
 		}
-		// dirty bit = 0
-		// 인자로 받은 dirty의 값이 1이면 page의 dirty bit을 1로, 0이면 0으로 변경해준다.
-		// present bit = 0
-		// 페이지의 present bit 값을 0으로 만들어주는 함수
-		// pml4_clear_page(curr->pml4, find_page->va); 
 		addr += PGSIZE;
 	}
 }
@@ -177,7 +163,6 @@ bool *do_lazy_mmap(struct page *page, void *aux)
 	page->file.upage = lm->upage;
 	page->file.page_length = lm->page_read_bytes;
 	page->file.total_length = lm->length;
-	//off통과
 	page->file.offset = lm->offset;
 	if (kpage == NULL)
 		return false;
